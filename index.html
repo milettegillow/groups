@@ -18,6 +18,7 @@
     padding: 16px;
   }
   h1 { font-size: 15px; font-weight: bold; margin: 0 0 12px 0; }
+  h2 { font-size: 13px; font-weight: bold; margin: 0 0 8px 0; }
   section {
     border: 1px solid #000;
     padding: 12px;
@@ -26,7 +27,7 @@
   .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; }
   .row:last-child { margin-bottom: 0; }
   label { display: inline-flex; align-items: center; gap: 4px; }
-  input, button, select {
+  input, button, textarea {
     font-family: inherit;
     font-size: 13px;
     color: #000;
@@ -44,23 +45,63 @@
   .muted { font-size: 12px; }
   .day { border-top: 1px solid #000; padding-top: 8px; margin-top: 8px; }
   .day:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
-  .date { font-weight: bold; }
-  hr { border: 0; border-top: 1px solid #000; margin: 8px 0; }
+  .label { font-weight: bold; }
   .hidden { display: none; }
+  textarea {
+    width: 100%;
+    min-height: 84px;
+    margin-top: 8px;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+  .names { columns: 3 auto; }
+  .names li { break-inside: avoid; }
 </style>
 </head>
 <body>
 
 <h1>Groups</h1>
 
+<script>
+"use strict";
+
+const people = ["Sissi","Fatimah","Dimple","Iana","Shreya","Yasmine","Sara","Chloe","Malia","Nadaa","Alveera","Dara","Lisa","Flavia","Almeena","Mango","Naama","Helena","Nabanita","Lydia"];
+
+const days = [
+  { label: "Day 1", groups: [
+    ["Sissi","Fatimah","Dimple","Iana","Shreya"],
+    ["Yasmine","Sara","Chloe","Malia","Nadaa"],
+    ["Alveera","Dara","Lisa","Flavia","Almeena"],
+    ["Mango","Naama","Helena","Nabanita","Lydia"]
+  ]},
+  { label: "Day 2", groups: [
+    ["Sissi","Yasmine","Alveera","Mango"],
+    ["Fatimah","Sara","Flavia","Helena"],
+    ["Dimple","Chloe","Lisa","Naama"],
+    ["Iana","Malia","Dara","Lydia"],
+    ["Shreya","Nadaa","Almeena","Nabanita"]
+  ]},
+  { label: "Day 3", groups: [
+    ["Sissi","Dara"],["Fatimah","Yasmine"],["Almeena","Sara"],["Flavia","Iana"],
+    ["Dimple","Malia"],["Shreya","Alveera"],["Chloe","Nadaa"],["Helena","Lisa"],
+    ["Nabanita","Lydia"],["Mango","Naama"]
+  ]}
+];
+</script>
+
 <section>
-  <div class="row">
-    <span id="count">People: -</span>
-    <label>Date <input type="date" id="date"></label>
-  </div>
+  <h2>Founders</h2>
+  <div id="founders"></div>
 </section>
 
 <section>
+  <h2>Past groups</h2>
+  <div id="past"></div>
+</section>
+
+<section>
+  <h2>Generate</h2>
   <div class="row">
     <label>Target group size <input type="number" id="target" min="1" value="3"></label>
     <label><input type="radio" name="mode" value="rough" checked> rough</label>
@@ -68,48 +109,39 @@
     <button id="generate">Generate</button>
     <button id="regenerate">Regenerate</button>
   </div>
-  <div id="genWarn" class="warn hidden"></div>
+  <div id="warn" class="warn hidden"></div>
   <div id="suggestion" class="muted">No groups generated yet.</div>
-  <div class="row" style="margin-top:8px;">
-    <button id="save">Save today</button>
-    <span class="muted">Nothing is saved until you press this. It downloads an updated history.json.</span>
+  <div id="snippetWrap" class="hidden">
+    <div class="row" style="margin-top:8px;">
+      <span class="muted">Ready to paste into the days array:</span>
+      <button id="copy">Copy</button>
+    </div>
+    <textarea id="snippet" readonly spellcheck="false"></textarea>
   </div>
 </section>
 
 <section>
-  <div class="muted">Past days</div>
-  <div id="past" class="muted">None saved yet.</div>
-</section>
-
-<section>
-  <div class="muted">Who hasn't met whom</div>
-  <div id="unmet" class="muted">-</div>
+  <h2>Unmet pairs</h2>
+  <div id="unmet" class="muted"></div>
 </section>
 
 <script>
 "use strict";
 
-const PENALTY = 1000;   // large cost applied to any pair that has met before
+const PENALTY = 1000;   // large cost applied to any pair that has already met
 const RESTARTS = 3000;
 
-let data = { people: [], days: [] };
-let met = [];           // met[i][j] = times person i and j have shared a group
-let current = null;     // latest suggested groups as arrays of indices
-
 const $ = id => document.getElementById(id);
+const index = new Map(people.map((name, i) => [name, i]));
 
-function todayStr() {
-  const d = new Date();
-  const p = n => String(n).padStart(2, "0");
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
-}
+let met = [];        // met[i][j] = times i and j have shared a group
+let current = null;  // latest suggested groups as arrays of indices
 
-// Build the pairwise "times met" matrix from history.
+// Build the pairwise "times met" matrix from the days array.
 function buildMet() {
-  const n = data.people.length;
-  const index = new Map(data.people.map((name, i) => [name, i]));
+  const n = people.length;
   met = Array.from({ length: n }, () => new Array(n).fill(0));
-  for (const day of data.days) {
+  for (const day of days) {
     for (const group of day.groups) {
       const ids = group.map(name => index.get(name)).filter(i => i !== undefined);
       for (let a = 0; a < ids.length; a++) {
@@ -122,13 +154,13 @@ function buildMet() {
   }
 }
 
-// Cost of putting person p alongside person m, given their meeting history.
+// Cost of seating person p alongside person m, given their history.
 function pairCost(p, m) {
   const c = met[p][m];
   return c > 0 ? PENALTY + c : 0;
 }
 
-// Group sizes for a given target and mode. Returns null (precise, uneven) to signal a warning.
+// Group sizes for a target and mode. Returns null (precise, uneven) to signal a warning.
 function groupSizes(n, target, precise) {
   if (precise) {
     if (n % target !== 0) return null;
@@ -139,7 +171,7 @@ function groupSizes(n, target, precise) {
   const rem = n % G;
   const sizes = [];
   for (let i = 0; i < G; i++) sizes.push(i < rem ? base + 1 : base);
-  return sizes; // e.g. target 3, n 20 -> [4,4,3,3,3,3]
+  return sizes; // target 3, n 20 -> [4,4,3,3,3,3]
 }
 
 function shuffle(arr) {
@@ -180,14 +212,23 @@ function scoreOf(groups) {
   return s;
 }
 
+function showWarn(text) {
+  const w = $("warn");
+  w.textContent = text;
+  w.classList.remove("hidden");
+}
+
 function generate() {
-  $("genWarn").classList.add("hidden");
-  const n = data.people.length;
+  $("warn").classList.add("hidden");
+  $("snippetWrap").classList.add("hidden");
+  const n = people.length;
   const target = parseInt($("target").value, 10);
   const precise = document.querySelector('input[name="mode"]:checked').value === "precise";
 
   if (!target || target < 1) {
     showWarn("Enter a target group size of 1 or more.");
+    current = null;
+    $("suggestion").textContent = "No groups generated.";
     return;
   }
   const caps = groupSizes(n, target, precise);
@@ -198,90 +239,78 @@ function generate() {
     return;
   }
 
-  const people = data.people.map((_, i) => i);
+  const ids = people.map((_, i) => i);
   let best = null, bestScore = Infinity;
   for (let r = 0; r < RESTARTS; r++) {
-    const groups = assign(shuffle(people.slice()), caps);
+    const groups = assign(shuffle(ids.slice()), caps);
     const s = scoreOf(groups);
     if (s < bestScore) { bestScore = s; best = groups; }
-    if (bestScore === 0) break; // cannot do better than no repeats
+    if (bestScore === 0) break; // cannot beat no repeats
   }
 
   current = best;
-  renderSuggestion(bestScore);
+  renderSuggestion();
 }
 
-function showWarn(text) {
-  const w = $("genWarn");
-  w.textContent = text;
-  w.classList.remove("hidden");
+function nextLabel() {
+  if (days.length) {
+    const last = days[days.length - 1].label;
+    const m = last.match(/(\d+)\s*$/);
+    if (m) return last.slice(0, m.index) + (parseInt(m[1], 10) + 1);
+  }
+  return "Day " + (days.length + 1);
 }
 
-function renderSuggestion(bestScore) {
+function renderSuggestion() {
   const el = $("suggestion");
-  el.className = "";
   if (!current) { el.textContent = "No groups generated."; return; }
+
   let repeats = 0;
   for (const g of current) {
     for (let i = 0; i < g.length; i++)
       for (let j = i + 1; j < g.length; j++)
         if (met[g[i]][g[j]] > 0) repeats++;
   }
-  let html = "<ol>";
-  current.forEach(g => {
-    html += "<li>" + g.map(i => escapeHtml(data.people[i])).join(", ") + "</li>";
+
+  let html = "";
+  current.forEach((g, i) => {
+    html += "<div>Group " + (i + 1) + ": " + g.map(x => escapeHtml(people[x])).join(", ") + "</div>";
   });
-  html += "</ol>";
-  html += '<div class="muted">Repeat pairings in this suggestion: ' + repeats + "</div>";
+  html += '<div class="muted" style="margin-top:6px;">Repeat pairings in this suggestion: ' + repeats + "</div>";
   el.innerHTML = html;
+
+  const label = nextLabel();
+  const groupsText = current.map(g => "[" + g.map(x => '"' + people[x] + '"').join(",") + "]").join(",\n    ");
+  const snippet = '{ label: "' + label + '", groups: [\n    ' + groupsText + '\n  ] },';
+  $("snippet").value = snippet;
+  $("snippetWrap").classList.remove("hidden");
 }
 
-function saveToday() {
-  if (!current) { alert("Generate groups first."); return; }
-  const date = $("date").value;
-  if (!date) { alert("Choose a date."); return; }
-  if (data.days.some(d => d.date === date)) {
-    if (!confirm("A day with the date " + date + " already exists in history. Add another entry for it anyway?")) return;
-  }
-  const groups = current.map(g => g.map(i => data.people[i]));
-  data.days.push({ date: date, groups: groups });
-  buildMet();
-  renderPast();
-  renderUnmet();
-  renderSuggestion();
-  downloadHistory();
-}
-
-function downloadHistory() {
-  const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "history.json";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+function renderFounders() {
+  let html = '<div class="muted">' + people.length + " founders</div><ol class=\"names\">";
+  people.forEach(name => { html += "<li>" + escapeHtml(name) + "</li>"; });
+  html += "</ol>";
+  $("founders").innerHTML = html;
 }
 
 function renderPast() {
   const el = $("past");
-  if (data.days.length === 0) { el.textContent = "None saved yet."; return; }
-  const days = data.days.slice().sort((a, b) => b.date.localeCompare(a.date));
+  if (!days.length) { el.textContent = "None yet."; return; }
   let html = "";
-  days.forEach(day => {
-    html += '<div class="day"><span class="date">' + escapeHtml(day.date) + "</span><ol>";
-    day.groups.forEach(g => {
-      html += "<li>" + g.map(escapeHtml).join(", ") + "</li>";
+  for (let d = days.length - 1; d >= 0; d--) {
+    const day = days[d];
+    html += '<div class="day"><span class="label">' + escapeHtml(day.label) + "</span>";
+    day.groups.forEach((g, i) => {
+      html += "<div>Group " + (i + 1) + ": " + g.map(escapeHtml).join(", ") + "</div>";
     });
-    html += "</ol></div>";
-  });
+    html += "</div>";
+  }
   el.innerHTML = html;
 }
 
 function renderUnmet() {
   const el = $("unmet");
-  const n = data.people.length;
+  const n = people.length;
   const totalPairs = n * (n - 1) / 2;
   let unmetPairs = 0;
   let html = "<ul>";
@@ -290,45 +319,44 @@ function renderUnmet() {
     for (let j = 0; j < n; j++) {
       if (i === j) continue;
       if (met[i][j] === 0) {
-        missing.push(data.people[j]);
+        missing.push(people[j]);
         if (j > i) unmetPairs++;
       }
     }
-    const line = escapeHtml(data.people[i]) + " still needs to meet: " +
+    const line = escapeHtml(people[i]) + " still needs to meet: " +
       (missing.length ? missing.map(escapeHtml).join(", ") : "everyone met");
     html += "<li>" + line + "</li>";
   }
   html += "</ul>";
-  html = "<div>" + unmetPairs + " of " + totalPairs + " possible pairs have not yet met.</div>" + html;
-  el.innerHTML = html;
+  el.innerHTML = "<div>" + unmetPairs + " of " + totalPairs + " possible pairs have not yet met.</div>" + html;
 }
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
-async function init() {
-  $("date").value = todayStr();
-  try {
-    const res = await fetch("./history.json", { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    data = await res.json();
-  } catch (e) {
-    showWarn("Could not load history.json. Serve this folder with a local server, e.g. python3 -m http.server, and open the page through it.");
+function copySnippet() {
+  const ta = $("snippet");
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(ta.value).catch(() => {});
   }
-  if (!data.people) data.people = [];
-  if (!data.days) data.days = [];
-  $("count").textContent = "People: " + data.people.length;
-  buildMet();
-  renderPast();
-  renderUnmet();
-
-  $("generate").addEventListener("click", generate);
-  $("regenerate").addEventListener("click", generate);
-  $("save").addEventListener("click", saveToday);
+  const btn = $("copy");
+  const old = btn.textContent;
+  btn.textContent = "Copied";
+  setTimeout(() => { btn.textContent = old; }, 1200);
 }
 
-init();
+buildMet();
+renderFounders();
+renderPast();
+renderUnmet();
+$("generate").addEventListener("click", generate);
+$("regenerate").addEventListener("click", generate);
+$("copy").addEventListener("click", copySnippet);
 </script>
 
 </body>
