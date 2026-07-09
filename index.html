@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groups</title>
+<style>
+  * { box-sizing: border-box; border-radius: 0; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  h1 { font-size: 15px; font-weight: bold; margin: 0 0 12px 0; }
+  section {
+    border: 1px solid #000;
+    padding: 12px;
+    margin: 0 0 12px 0;
+  }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .row:last-child { margin-bottom: 0; }
+  label { display: inline-flex; align-items: center; gap: 4px; }
+  input, button, select {
+    font-family: inherit;
+    font-size: 13px;
+    color: #000;
+    background: #fff;
+    border: 1px solid #000;
+    padding: 3px 6px;
+  }
+  input[type="number"] { width: 56px; }
+  input[type="radio"] { margin: 0; }
+  button { cursor: pointer; }
+  button:hover { background: #000; color: #fff; }
+  ol, ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 1px 0; }
+  .warn { border: 1px solid #000; padding: 6px; margin-top: 8px; }
+  .muted { font-size: 12px; }
+  .day { border-top: 1px solid #000; padding-top: 8px; margin-top: 8px; }
+  .day:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+  .date { font-weight: bold; }
+  hr { border: 0; border-top: 1px solid #000; margin: 8px 0; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Groups</h1>
+
+<section>
+  <div class="row">
+    <span id="count">People: -</span>
+    <label>Date <input type="date" id="date"></label>
+  </div>
+</section>
+
+<section>
+  <div class="row">
+    <label>Target group size <input type="number" id="target" min="1" value="3"></label>
+    <label><input type="radio" name="mode" value="rough" checked> rough</label>
+    <label><input type="radio" name="mode" value="precise"> precise</label>
+    <button id="generate">Generate</button>
+    <button id="regenerate">Regenerate</button>
+  </div>
+  <div id="genWarn" class="warn hidden"></div>
+  <div id="suggestion" class="muted">No groups generated yet.</div>
+  <div class="row" style="margin-top:8px;">
+    <button id="save">Save today</button>
+    <span class="muted">Nothing is saved until you press this. It downloads an updated history.json.</span>
+  </div>
+</section>
+
+<section>
+  <div class="muted">Past days</div>
+  <div id="past" class="muted">None saved yet.</div>
+</section>
+
+<section>
+  <div class="muted">Who hasn't met whom</div>
+  <div id="unmet" class="muted">-</div>
+</section>
+
+<script>
+"use strict";
+
+const PENALTY = 1000;   // large cost applied to any pair that has met before
+const RESTARTS = 3000;
+
+let data = { people: [], days: [] };
+let met = [];           // met[i][j] = times person i and j have shared a group
+let current = null;     // latest suggested groups as arrays of indices
+
+const $ = id => document.getElementById(id);
+
+function todayStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+// Build the pairwise "times met" matrix from history.
+function buildMet() {
+  const n = data.people.length;
+  const index = new Map(data.people.map((name, i) => [name, i]));
+  met = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (const day of data.days) {
+    for (const group of day.groups) {
+      const ids = group.map(name => index.get(name)).filter(i => i !== undefined);
+      for (let a = 0; a < ids.length; a++) {
+        for (let b = a + 1; b < ids.length; b++) {
+          met[ids[a]][ids[b]]++;
+          met[ids[b]][ids[a]]++;
+        }
+      }
+    }
+  }
+}
+
+// Cost of putting person p alongside person m, given their meeting history.
+function pairCost(p, m) {
+  const c = met[p][m];
+  return c > 0 ? PENALTY + c : 0;
+}
+
+// Group sizes for a given target and mode. Returns null (precise, uneven) to signal a warning.
+function groupSizes(n, target, precise) {
+  if (precise) {
+    if (n % target !== 0) return null;
+    return new Array(n / target).fill(target);
+  }
+  const G = Math.max(1, Math.floor(n / target));
+  const base = Math.floor(n / G);
+  const rem = n % G;
+  const sizes = [];
+  for (let i = 0; i < G; i++) sizes.push(i < rem ? base + 1 : base);
+  return sizes; // e.g. target 3, n 20 -> [4,4,3,3,3,3]
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Randomised greedy: place each person into the open group where they have met the members fewest times.
+function assign(order, caps) {
+  const groups = caps.map(() => []);
+  for (const p of order) {
+    let best = -1, bestCost = Infinity;
+    for (let g = 0; g < groups.length; g++) {
+      if (groups[g].length >= caps[g]) continue;
+      let cost = 0;
+      for (const m of groups[g]) cost += pairCost(p, m);
+      if (cost < bestCost) { bestCost = cost; best = g; }
+    }
+    groups[best].push(p);
+  }
+  return groups;
+}
+
+// Total repeat-meeting cost of a full solution.
+function scoreOf(groups) {
+  let s = 0;
+  for (const g of groups) {
+    for (let i = 0; i < g.length; i++) {
+      for (let j = i + 1; j < g.length; j++) {
+        const c = met[g[i]][g[j]];
+        if (c > 0) s += PENALTY + c;
+      }
+    }
+  }
+  return s;
+}
+
+function generate() {
+  $("genWarn").classList.add("hidden");
+  const n = data.people.length;
+  const target = parseInt($("target").value, 10);
+  const precise = document.querySelector('input[name="mode"]:checked').value === "precise";
+
+  if (!target || target < 1) {
+    showWarn("Enter a target group size of 1 or more.");
+    return;
+  }
+  const caps = groupSizes(n, target, precise);
+  if (caps === null) {
+    showWarn(n + " people do not divide evenly into groups of " + target + ". Choose a different size or switch to rough.");
+    current = null;
+    $("suggestion").textContent = "No groups generated.";
+    return;
+  }
+
+  const people = data.people.map((_, i) => i);
+  let best = null, bestScore = Infinity;
+  for (let r = 0; r < RESTARTS; r++) {
+    const groups = assign(shuffle(people.slice()), caps);
+    const s = scoreOf(groups);
+    if (s < bestScore) { bestScore = s; best = groups; }
+    if (bestScore === 0) break; // cannot do better than no repeats
+  }
+
+  current = best;
+  renderSuggestion(bestScore);
+}
+
+function showWarn(text) {
+  const w = $("genWarn");
+  w.textContent = text;
+  w.classList.remove("hidden");
+}
+
+function renderSuggestion(bestScore) {
+  const el = $("suggestion");
+  el.className = "";
+  if (!current) { el.textContent = "No groups generated."; return; }
+  let repeats = 0;
+  for (const g of current) {
+    for (let i = 0; i < g.length; i++)
+      for (let j = i + 1; j < g.length; j++)
+        if (met[g[i]][g[j]] > 0) repeats++;
+  }
+  let html = "<ol>";
+  current.forEach(g => {
+    html += "<li>" + g.map(i => escapeHtml(data.people[i])).join(", ") + "</li>";
+  });
+  html += "</ol>";
+  html += '<div class="muted">Repeat pairings in this suggestion: ' + repeats + "</div>";
+  el.innerHTML = html;
+}
+
+function saveToday() {
+  if (!current) { alert("Generate groups first."); return; }
+  const date = $("date").value;
+  if (!date) { alert("Choose a date."); return; }
+  if (data.days.some(d => d.date === date)) {
+    if (!confirm("A day with the date " + date + " already exists in history. Add another entry for it anyway?")) return;
+  }
+  const groups = current.map(g => g.map(i => data.people[i]));
+  data.days.push({ date: date, groups: groups });
+  buildMet();
+  renderPast();
+  renderUnmet();
+  renderSuggestion();
+  downloadHistory();
+}
+
+function downloadHistory() {
+  const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "history.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderPast() {
+  const el = $("past");
+  if (data.days.length === 0) { el.textContent = "None saved yet."; return; }
+  const days = data.days.slice().sort((a, b) => b.date.localeCompare(a.date));
+  let html = "";
+  days.forEach(day => {
+    html += '<div class="day"><span class="date">' + escapeHtml(day.date) + "</span><ol>";
+    day.groups.forEach(g => {
+      html += "<li>" + g.map(escapeHtml).join(", ") + "</li>";
+    });
+    html += "</ol></div>";
+  });
+  el.innerHTML = html;
+}
+
+function renderUnmet() {
+  const el = $("unmet");
+  const n = data.people.length;
+  const totalPairs = n * (n - 1) / 2;
+  let unmetPairs = 0;
+  let html = "<ul>";
+  for (let i = 0; i < n; i++) {
+    const missing = [];
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      if (met[i][j] === 0) {
+        missing.push(data.people[j]);
+        if (j > i) unmetPairs++;
+      }
+    }
+    const line = escapeHtml(data.people[i]) + " still needs to meet: " +
+      (missing.length ? missing.map(escapeHtml).join(", ") : "everyone met");
+    html += "<li>" + line + "</li>";
+  }
+  html += "</ul>";
+  html = "<div>" + unmetPairs + " of " + totalPairs + " possible pairs have not yet met.</div>" + html;
+  el.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+async function init() {
+  $("date").value = todayStr();
+  try {
+    const res = await fetch("./history.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    data = await res.json();
+  } catch (e) {
+    showWarn("Could not load history.json. Serve this folder with a local server, e.g. python3 -m http.server, and open the page through it.");
+  }
+  if (!data.people) data.people = [];
+  if (!data.days) data.days = [];
+  $("count").textContent = "People: " + data.people.length;
+  buildMet();
+  renderPast();
+  renderUnmet();
+
+  $("generate").addEventListener("click", generate);
+  $("regenerate").addEventListener("click", generate);
+  $("save").addEventListener("click", saveToday);
+}
+
+init();
+</script>
+
+</body>
+</html>
