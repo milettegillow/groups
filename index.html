@@ -146,13 +146,6 @@
   .warn { border: var(--line); padding: 8px 10px; margin-bottom: 12px; }
   .empty { color: #000; font-style: normal; }
 
-  /* Snippet */
-  .snippet-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 12px 0 6px;
-  }
   textarea {
     width: 100%;
     min-height: 84px;
@@ -174,7 +167,8 @@
 
 const people = ["Sissi","Fatimah","Dimple","Iana","Shreya","Yasmine","Sara","Chloe","Malia","Nadaa","Alveera","Dara","Lisa","Flavia","Almeena","Mango","Naama","Helena","Nabanita","Lydia"];
 
-const days = [
+// Inline seed data. localStorage becomes the source of truth once seeded from these.
+const SEED_DAYS = [
   { label: "Day 1", groups: [
     ["Sissi","Fatimah","Dimple","Iana","Shreya"],
     ["Yasmine","Sara","Chloe","Malia","Nadaa"],
@@ -195,7 +189,11 @@ const days = [
   ]}
 ];
 
-const blocked = [];
+const SEED_BLOCKED = [];
+
+// Working state, loaded from localStorage on init (see loadState).
+let days = [];
+let blocked = [];
 </script>
 
 <section>
@@ -213,11 +211,6 @@ const blocked = [];
     <button id="addBlock">Add block</button>
   </div>
   <ul class="plain" id="blockList"></ul>
-  <div class="snippet-head">
-    <span class="muted">Ready to paste as the blocked constant:</span>
-    <button class="mini" id="copyBlocked">Copy</button>
-  </div>
-  <textarea id="blockedSnippet" readonly spellcheck="false"></textarea>
 </section>
 
 <section>
@@ -234,11 +227,10 @@ const blocked = [];
   <div id="warn" class="warn hidden"></div>
   <div id="suggestion" class="muted">No groups generated yet.</div>
   <div id="snippetWrap" class="hidden">
-    <div class="snippet-head">
-      <span class="muted">Ready to paste into the days array:</span>
-      <button class="mini" id="copyDay">Copy</button>
+    <div class="controls">
+      <button id="saveDay">Save day</button>
+      <span class="muted" id="saveHint"></span>
     </div>
-    <textarea id="daySnippet" readonly spellcheck="false"></textarea>
   </div>
 </section>
 
@@ -258,6 +250,15 @@ const blocked = [];
   <div id="unmet" class="muted"></div>
 </section>
 
+<section>
+  <h2>Utilities</h2>
+  <div class="controls">
+    <button id="exportData">Export data</button>
+    <button id="resetData">Reset to file data</button>
+  </div>
+  <textarea id="exportArea" class="hidden" readonly spellcheck="false"></textarea>
+</section>
+
 <script>
 "use strict";
 
@@ -271,6 +272,46 @@ const N = people.length;
 let met = [];       // met[i][j] = times i and j have shared a group (all founders)
 let block = [];     // block[i][j] = true if i and j must never share a group
 let current = null; // latest suggested groups as arrays of indices
+
+const STORAGE_KEY = "groups-data";
+
+// Fresh copy of the inline seed data.
+function defaultData() {
+  return {
+    people: people.slice(),
+    days: JSON.parse(JSON.stringify(SEED_DAYS)),
+    blocked: JSON.parse(JSON.stringify(SEED_BLOCKED))
+  };
+}
+
+// Load state from localStorage, seeding it from the inline constants on first run.
+function loadState() {
+  let data = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) data = JSON.parse(raw);
+  } catch (e) { data = null; }
+  if (!data) {
+    data = defaultData();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  days = Array.isArray(data.days) ? data.days : [];
+  blocked = Array.isArray(data.blocked) ? data.blocked : [];
+}
+
+// Persist the working state as the source of truth.
+function saveState() {
+  const data = { people: people.slice(), days: days, blocked: blocked };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+
+// Rebuild every view that depends on days (counts, past days, unmet, founder view).
+function refreshDerived() {
+  buildMet();
+  renderPast();
+  renderUnmet();
+  renderFounderView();
+}
 
 // Build the pairwise "times met" matrix from the days array.
 function buildMet() {
@@ -454,10 +495,46 @@ function renderSuggestion() {
   html += '<p class="muted">Repeat pairings in this suggestion: ' + repeats + "</p>";
   el.innerHTML = html;
 
-  const label = nextLabel();
-  const groupsText = current.map(g => "[" + g.map(x => '"' + people[x] + '"').join(",") + "]").join(",\n    ");
-  $("daySnippet").value = '{ label: "' + label + '", groups: [\n    ' + groupsText + '\n  ] },';
+  $("saveHint").textContent = "Will be saved as " + nextLabel() + ".";
   $("snippetWrap").classList.remove("hidden");
+}
+
+// Append the current suggestion to saved days and refresh everything.
+function saveDay() {
+  if (!current) return;
+  const label = nextLabel();
+  const groups = current.map(g => g.map(x => people[x]));
+  days.push({ label: label, groups: groups });
+  saveState();
+  refreshDerived();
+  current = null;
+  $("suggestion").innerHTML = '<p class="muted">Saved as ' + escapeHtml(label) + ".</p>";
+  $("snippetWrap").classList.add("hidden");
+}
+
+// Copy the full state as JSON for backup.
+function exportData() {
+  const data = { people: people.slice(), days: days, blocked: blocked };
+  const ta = $("exportArea");
+  ta.value = JSON.stringify(data, null, 2);
+  ta.classList.remove("hidden");
+  copyFrom("exportArea", "exportData");
+}
+
+// Clear localStorage and reseed from the inline constants.
+function resetData() {
+  if (!confirm("Reset to the original file data? This clears all saved changes.")) return;
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  const data = defaultData();
+  days = data.days;
+  blocked = data.blocked;
+  saveState();
+  current = null;
+  renderFounders();
+  renderBlocks();
+  refreshDerived();
+  clearSuggestion("No groups generated yet.");
+  $("exportArea").classList.add("hidden");
 }
 
 /* Founders */
@@ -492,11 +569,13 @@ function addBlock() {
     (p[0] === na && p[1] === nb) || (p[0] === nb && p[1] === na));
   if (exists) { showBlockNote("That pair is already blocked."); return; }
   blocked.push([na, nb]);
+  saveState();
   renderBlocks();
 }
 
 function removeBlock(i) {
   blocked.splice(i, 1);
+  saveState();
   renderBlocks();
 }
 
@@ -534,8 +613,6 @@ function renderBlocks() {
       list.appendChild(li);
     });
   }
-  const body = blocked.map(p => '["' + p[0] + '","' + p[1] + '"]').join(", ");
-  $("blockedSnippet").value = "const blocked = [" + body + "];";
 }
 
 /* Past days */
@@ -663,6 +740,7 @@ function copyFrom(id, btnId) {
 }
 
 /* Init */
+loadState();
 buildMet();
 renderFounders();
 renderFounderView();
@@ -676,8 +754,9 @@ renderUnmet();
 $("addBlock").addEventListener("click", addBlock);
 $("generate").addEventListener("click", generate);
 $("regenerate").addEventListener("click", generate);
-$("copyDay").addEventListener("click", () => copyFrom("daySnippet", "copyDay"));
-$("copyBlocked").addEventListener("click", () => copyFrom("blockedSnippet", "copyBlocked"));
+$("saveDay").addEventListener("click", saveDay);
+$("exportData").addEventListener("click", exportData);
+$("resetData").addEventListener("click", resetData);
 
 // Any founder name anywhere selects that founder.
 document.addEventListener("click", e => {
