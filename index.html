@@ -17,7 +17,7 @@
     font-size: 14px;
     line-height: 1.5;
     color: #000;
-    background: #fff;
+    background: #faf9f6;
     max-width: 760px;
     margin: 0 auto;
     padding: 32px 24px 64px;
@@ -73,11 +73,57 @@
     gap: 6px 16px;
     margin-bottom: 12px;
   }
-  .founders-grid label {
+  .founders-grid .founder-item {
     display: flex;
     align-items: center;
     gap: 8px;
   }
+
+  /* Clickable names */
+  [data-name] { cursor: pointer; }
+  .name:hover { text-decoration: underline; }
+  .name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    margin-bottom: 16px;
+  }
+  .name-row .name { padding: 2px 5px; }
+  .name-row .name.selected {
+    background: #000;
+    color: #fff;
+    text-decoration: none;
+  }
+  .clear-btn { margin-left: 4px; }
+
+  /* Founder view */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0 0 16px;
+    font-size: 12px;
+  }
+  .legend .swatch { cursor: default; }
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .pill, .swatch {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .history-line { padding: 3px 0; }
+  .met-multi { background: #ffe680; padding: 0 3px; }
+  .founder-hint { font-size: 13px; }
 
   /* Lists */
   ul.plain { list-style: none; margin: 0 0 12px; padding: 0; }
@@ -194,6 +240,12 @@ const blocked = [];
     </div>
     <textarea id="daySnippet" readonly spellcheck="false"></textarea>
   </div>
+</section>
+
+<section>
+  <h2>Founder view</h2>
+  <div class="name-row" id="founderRow"></div>
+  <div id="founderDetail"></div>
 </section>
 
 <section>
@@ -396,7 +448,7 @@ function renderSuggestion() {
 
   let html = '<ul class="groups-list">';
   current.forEach((g, i) => {
-    html += "<li>Group " + (i + 1) + ": " + g.map(x => escapeHtml(people[x])).join(", ") + "</li>";
+    html += "<li>Group " + (i + 1) + ": " + g.map(x => nameHtml(people[x])).join(", ") + "</li>";
   });
   html += "</ul>";
   html += '<p class="muted">Repeat pairings in this suggestion: ' + repeats + "</p>";
@@ -413,7 +465,7 @@ function renderFounders() {
   $("totalCount").textContent = N;
   let html = "";
   people.forEach((name, i) => {
-    html += '<label><input type="checkbox" id="p' + i + '" checked> ' + escapeHtml(name) + "</label>";
+    html += '<div class="founder-item"><input type="checkbox" id="p' + i + '" checked> ' + nameHtml(name) + "</div>";
   });
   $("founders").innerHTML = html;
   people.forEach((_, i) => {
@@ -495,7 +547,7 @@ function renderPast() {
     const day = days[d];
     html += '<div class="day"><div class="day-label">' + escapeHtml(day.label) + '</div><ul class="groups-list">';
     day.groups.forEach((g, i) => {
-      html += "<li>Group " + (i + 1) + ": " + g.map(escapeHtml).join(", ") + "</li>";
+      html += "<li>Group " + (i + 1) + ": " + g.map(n => nameHtml(n)).join(", ") + "</li>";
     });
     html += "</ul></div>";
   }
@@ -517,6 +569,87 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+/* Founder view */
+let selectedFounder = null;
+
+// Clickable name span used everywhere a founder name appears.
+function nameHtml(name, cls) {
+  const e = escapeHtml(name);
+  return '<span data-name="' + e + '" class="name' + (cls ? " " + cls : "") + '">' + e + "</span>";
+}
+
+// Meeting-count colours (the only colour in the app apart from the yellow highlight).
+function colourFor(c) {
+  if (c <= 0) return { bg: "#d9d9d9", fg: "#000" };
+  if (c === 1) return { bg: "#1e6b3a", fg: "#fff" };
+  if (c === 2) return { bg: "#5ea345", fg: "#fff" };
+  if (c === 3) return { bg: "#c9b727", fg: "#000" };
+  if (c === 4) return { bg: "#e08a1e", fg: "#000" };
+  return { bg: "#cc2b2b", fg: "#fff" };
+}
+
+function selectFounder(name) {
+  selectedFounder = name || null;
+  renderFounderView();
+}
+
+function renderFounderView() {
+  const row = $("founderRow");
+  let rowHtml = people.map(n => {
+    const sel = n === selectedFounder ? " selected" : "";
+    return '<span data-name="' + escapeHtml(n) + '" class="name' + sel + '">' + escapeHtml(n) + "</span>";
+  }).join("");
+  if (selectedFounder) rowHtml += '<button class="mini clear-btn" id="clearFounder">Clear</button>';
+  row.innerHTML = rowHtml;
+  if (selectedFounder) {
+    const cb = $("clearFounder");
+    if (cb) cb.addEventListener("click", () => selectFounder(null));
+  }
+
+  const detail = $("founderDetail");
+  if (!selectedFounder) {
+    detail.innerHTML = '<p class="founder-hint muted">Select a founder to see who she has met.</p>';
+    return;
+  }
+  const s = index.get(selectedFounder);
+
+  // Legend of the six colours.
+  const levels = [[0, "0"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5 or more"]];
+  let legend = '<div class="legend">';
+  levels.forEach(([c, lbl]) => {
+    const col = colourFor(c);
+    legend += '<span class="swatch" style="background:' + col.bg + ";color:" + col.fg + '">' + lbl + "</span>";
+  });
+  legend += "</div>";
+
+  // A pill per other founder, coloured by times met, count shown inside.
+  let pills = '<div class="pills">';
+  people.forEach((n, j) => {
+    if (j === s) return;
+    const c = met[s][j];
+    const col = colourFor(c);
+    pills += '<span data-name="' + escapeHtml(n) + '" class="pill" style="background:' + col.bg + ";color:" + col.fg + '">' + escapeHtml(n) + " · " + c + "</span>";
+  });
+  pills += "</div>";
+
+  // Day-by-day history: her groupmates only, repeat relationships highlighted.
+  let hist = "";
+  days.forEach(day => {
+    let mates = null;
+    for (const g of day.groups) {
+      const ids = g.map(name => index.get(name));
+      if (ids.includes(s)) { mates = ids.filter(x => x !== s); break; }
+    }
+    if (mates && mates.length) {
+      const names = mates.map(x => nameHtml(people[x], met[s][x] > 1 ? "met-multi" : "")).join(", ");
+      hist += '<div class="history-line">' + escapeHtml(day.label) + ": " + names + "</div>";
+    }
+  });
+  if (!hist) hist = '<p class="muted">No shared days yet.</p>';
+
+  detail.innerHTML = legend + pills + "<div>" + hist + "</div>";
+}
+
 function copyFrom(id, btnId) {
   const ta = $(id);
   ta.select();
@@ -532,6 +665,7 @@ function copyFrom(id, btnId) {
 /* Init */
 buildMet();
 renderFounders();
+renderFounderView();
 fillSelect($("blockA"));
 fillSelect($("blockB"));
 $("blockB").selectedIndex = Math.min(1, N - 1);
@@ -544,6 +678,12 @@ $("generate").addEventListener("click", generate);
 $("regenerate").addEventListener("click", generate);
 $("copyDay").addEventListener("click", () => copyFrom("daySnippet", "copyDay"));
 $("copyBlocked").addEventListener("click", () => copyFrom("blockedSnippet", "copyBlocked"));
+
+// Any founder name anywhere selects that founder.
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-name]");
+  if (t) selectFounder(t.getAttribute("data-name"));
+});
 </script>
 
 </body>
