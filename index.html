@@ -157,9 +157,26 @@
   }
   .stat { font-weight: 700; }
   .hidden { display: none; }
+
+  /* Backup reminder banner */
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: var(--line);
+    padding: 6px 10px;
+    margin-bottom: var(--gap-lg);
+    font-size: 13px;
+  }
+  .banner .link { text-decoration: underline; cursor: pointer; }
 </style>
 </head>
 <body>
+
+<div id="backupBanner" class="banner hidden">
+  <span class="grow">Data not backed up in a while - <span class="link" id="bannerBackup">back up now</span></span>
+  <button class="mini" id="bannerDismiss">Dismiss</button>
+</div>
 
 <h1>Groups</h1>
 
@@ -187,6 +204,13 @@ const SEED_DAYS = [
     ["Sissi","Dara"],["Fatimah","Yasmine"],["Almeena","Sara"],["Flavia","Iana"],
     ["Dimple","Malia"],["Shreya","Alveera"],["Chloe","Nadaa"],["Helena","Lisa"],
     ["Nabanita","Lydia"],["Mango","Naama"]
+  ]},
+  { label: "Day 4", groups: [
+    ["Alveera","Nabanita","Malia","Fatimah"],
+    ["Dara","Helena","Dimple","Nadaa"],
+    ["Lisa","Lydia","Sara","Sissi"],
+    ["Naama","Almeena","Iana","Yasmine"],
+    ["Mango","Chloe","Flavia","Shreya"]
   ]}
 ];
 
@@ -255,7 +279,10 @@ let blocked = [];
   <h2>Utilities</h2>
   <div class="controls">
     <button id="exportData">Export data</button>
+    <button id="backupFile">Back up to file</button>
+    <button id="restoreFile">Restore from file</button>
     <button id="resetData">Reset to file data</button>
+    <input type="file" id="restoreInput" accept="application/json,.json" class="hidden">
   </div>
   <textarea id="exportArea" class="hidden" readonly spellcheck="false"></textarea>
 </section>
@@ -312,6 +339,7 @@ function refreshDerived() {
   renderPast();
   renderUnmet();
   renderFounderView();
+  updateBanner();
 }
 
 // Build the pairwise "times met" matrix from the days array.
@@ -538,6 +566,122 @@ function resetData() {
   $("exportArea").classList.add("hidden");
 }
 
+/* File backup (File System Access API, with a download fallback) */
+const LAST_BACKUP_KEY = "groups-last-backup";
+let backupHandle = null;      // kept in memory so repeat backups write silently
+let bannerDismissed = false;  // per-load only; a stale banner returns next load
+
+function stateJson() {
+  return JSON.stringify({ people: people.slice(), days: days, blocked: blocked }, null, 2);
+}
+
+function recordBackup() {
+  try { localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); } catch (e) {}
+}
+
+function flashButton(id, msg) {
+  const btn = $(id);
+  const old = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(() => { btn.textContent = old; }, 1200);
+}
+
+function downloadJson(text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "backup.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function backupToFile() {
+  const text = stateJson();
+  if (window.showSaveFilePicker) {
+    try {
+      if (!backupHandle) {
+        backupHandle = await window.showSaveFilePicker({
+          suggestedName: "backup.json",
+          types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
+        });
+      }
+      const writable = await backupHandle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      recordBackup();
+      updateBanner();
+      flashButton("backupFile", "Backed up");
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // picker cancelled, nothing to do
+      backupHandle = null;                      // handle unusable; fall back to a download
+      downloadJson(text);
+      recordBackup();
+      updateBanner();
+      flashButton("backupFile", "Downloaded");
+    }
+    return;
+  }
+  // No File System Access API (Safari/Firefox): download and still record the time.
+  downloadJson(text);
+  recordBackup();
+  updateBanner();
+  flashButton("backupFile", "Downloaded");
+}
+
+function restoreFromFile() {
+  $("restoreInput").click();
+}
+
+function handleRestoreInput(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data = null;
+    try { data = JSON.parse(reader.result); } catch (err) { data = null; }
+    if (!data || !Array.isArray(data.people) || !Array.isArray(data.days) || !Array.isArray(data.blocked)) {
+      alert("That file is not a valid backup. It must contain people, days and blocked.");
+      return;
+    }
+    if (!confirm("Replace all current data with this backup? This cannot be undone.")) return;
+    days = data.days;
+    blocked = data.blocked;
+    saveState();
+    current = null;
+    renderFounders();
+    renderBlocks();
+    refreshDerived();
+    clearSuggestion("No groups generated yet.");
+    $("exportArea").classList.add("hidden");
+  };
+  reader.readAsText(file);
+}
+
+/* Backup reminder banner */
+function isBackupStale() {
+  let last = null;
+  try { last = localStorage.getItem(LAST_BACKUP_KEY); } catch (e) {}
+  if (!last) return days.length >= 1; // never backed up, but there is data to lose
+  const age = Date.now() - parseInt(last, 10);
+  return age > 7 * 24 * 60 * 60 * 1000;
+}
+
+function updateBanner() {
+  const banner = $("backupBanner");
+  if (!banner) return;
+  if (!bannerDismissed && isBackupStale()) banner.classList.remove("hidden");
+  else banner.classList.add("hidden");
+}
+
+function dismissBanner() {
+  bannerDismissed = true;
+  updateBanner();
+}
+
 /* Founders */
 function renderFounders() {
   $("totalCount").textContent = N;
@@ -751,13 +895,19 @@ $("blockB").selectedIndex = Math.min(1, N - 1);
 renderBlocks();
 renderPast();
 renderUnmet();
+updateBanner();
 
 $("addBlock").addEventListener("click", addBlock);
 $("generate").addEventListener("click", generate);
 $("regenerate").addEventListener("click", generate);
 $("saveDay").addEventListener("click", saveDay);
 $("exportData").addEventListener("click", exportData);
+$("backupFile").addEventListener("click", backupToFile);
+$("restoreFile").addEventListener("click", restoreFromFile);
+$("restoreInput").addEventListener("change", handleRestoreInput);
 $("resetData").addEventListener("click", resetData);
+$("bannerBackup").addEventListener("click", backupToFile);
+$("bannerDismiss").addEventListener("click", dismissBanner);
 
 // Any founder name anywhere selects that founder.
 document.addEventListener("click", e => {
