@@ -1,506 +1,550 @@
 <!doctype html>
 <html lang="en-GB">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Groups</title>
-    <style>
-      * {
-        box-sizing: border-box;
-        border-radius: 0;
-      }
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
-      body {
-        font-family: system-ui, sans-serif;
-        font-size: 13px;
-        line-height: 1.4;
-        color: #000;
-        background: #fff;
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 16px;
-      }
-      h1 {
-        font-size: 15px;
-        font-weight: bold;
-        margin: 0 0 12px 0;
-      }
-      h2 {
-        font-size: 13px;
-        font-weight: bold;
-        margin: 0 0 8px 0;
-      }
-      section {
-        border: 1px solid #000;
-        padding: 12px;
-        margin: 0 0 12px 0;
-      }
-      .row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 8px;
-      }
-      .row:last-child {
-        margin-bottom: 0;
-      }
-      label {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-      }
-      input,
-      button,
-      textarea {
-        font-family: inherit;
-        font-size: 13px;
-        color: #000;
-        background: #fff;
-        border: 1px solid #000;
-        padding: 3px 6px;
-      }
-      input[type="number"] {
-        width: 56px;
-      }
-      input[type="radio"] {
-        margin: 0;
-      }
-      button {
-        cursor: pointer;
-      }
-      button:hover {
-        background: #000;
-        color: #fff;
-      }
-      ol,
-      ul {
-        margin: 6px 0;
-        padding-left: 20px;
-      }
-      li {
-        margin: 1px 0;
-      }
-      .warn {
-        border: 1px solid #000;
-        padding: 6px;
-        margin-top: 8px;
-      }
-      .muted {
-        font-size: 12px;
-      }
-      .day {
-        border-top: 1px solid #000;
-        padding-top: 8px;
-        margin-top: 8px;
-      }
-      .day:first-child {
-        border-top: 0;
-        padding-top: 0;
-        margin-top: 0;
-      }
-      .label {
-        font-weight: bold;
-      }
-      .hidden {
-        display: none;
-      }
-      textarea {
-        width: 100%;
-        min-height: 84px;
-        margin-top: 8px;
-        white-space: pre;
-        overflow-wrap: normal;
-        overflow-x: auto;
-      }
-      .names {
-        columns: 3 auto;
-      }
-      .names li {
-        break-inside: avoid;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Groups</h1>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groups</title>
+<style>
+  :root {
+    --gap: 8px;
+    --gap-lg: 24px;
+    --line: 1px solid #000;
+  }
+  * { box-sizing: border-box; border-radius: 0; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #000;
+    background: #fff;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 var(--gap-lg);
+  }
+  section { margin: 0 0 var(--gap-lg); }
+  h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    border-bottom: var(--line);
+  }
+  p { margin: 0 0 var(--gap); }
+  .muted { color: #000; font-size: 13px; }
+  .hint { font-size: 13px; margin-bottom: 12px; }
 
-    <script>
-      "use strict";
+  /* Controls */
+  input, button, select, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    color: #000;
+    background: #fff;
+    border: var(--line);
+    padding: 5px 8px;
+    line-height: 1.2;
+  }
+  input[type="number"] { width: 64px; }
+  input[type="checkbox"], input[type="radio"] { margin: 0; }
+  button { cursor: pointer; }
+  button:hover { background: #000; color: #fff; }
+  button:active { background: #000; color: #fff; }
 
-      const people = ["Sissi","Fatimah","Dimple","Iana","Shreya","Yasmine","Sara","Chloe","Malia","Nadaa","Alveera","Dara","Lisa","Flavia","Almeena","Mango","Naama","Helena","Nabanita","Lydia"];
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .field { display: inline-flex; align-items: center; gap: 8px; }
+  .radios { display: inline-flex; align-items: center; gap: 12px; }
+  .radios label { display: inline-flex; align-items: center; gap: 5px; }
 
-      const days = [
-        { label: "Day 1", groups: [
-          ["Sissi","Fatimah","Dimple","Iana","Shreya"],
-          ["Yasmine","Sara","Chloe","Malia","Nadaa"],
-          ["Alveera","Dara","Lisa","Flavia","Almeena"],
-          ["Mango","Naama","Helena","Nabanita","Lydia"]
-        ]},
-        { label: "Day 2", groups: [
-          ["Sissi","Yasmine","Alveera","Mango"],
-          ["Fatimah","Sara","Flavia","Helena"],
-          ["Dimple","Chloe","Lisa","Naama"],
-          ["Iana","Malia","Dara","Lydia"],
-          ["Shreya","Nadaa","Almeena","Nabanita"]
-        ]},
-        { label: "Day 3", groups: [
-          ["Sissi","Dara"],["Fatimah","Yasmine"],["Almeena","Sara"],["Flavia","Iana"],
-          ["Dimple","Malia"],["Shreya","Alveera"],["Chloe","Nadaa"],["Helena","Lisa"],
-          ["Nabanita","Lydia"],["Mango","Naama"]
-        ]}
-        { label: "Day 4", groups: [
-          ["Alveera","Nabanita","Malia","Fatimah"],
-          ["Dara","Helena","Dimple","Nadaa"],
-          ["Lisa","Lydia","Sara","Sissi"],
-          ["Naama","Almeena","Iana","Yasmine"],
-          ["Mango","Chloe","Flavia","Shreya"]
-        ] },
-      ];
-    </script>
+  /* Founders grid */
+  .founders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px 16px;
+    margin-bottom: 12px;
+  }
+  .founders-grid label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 
-    <section>
-      <h2>Founders</h2>
-      <div id="founders"></div>
-    </section>
+  /* Lists */
+  ul.plain { list-style: none; margin: 0 0 12px; padding: 0; }
+  ul.plain li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+  }
+  .grow { flex: 1; }
+  button.mini { padding: 2px 8px; font-size: 13px; }
 
-    <section>
-      <h2>Past groups</h2>
-      <div id="past"></div>
-    </section>
+  .groups-list { margin: 0; padding: 0; list-style: none; }
+  .groups-list li { padding: 2px 0; }
 
-    <section>
-      <h2>Generate</h2>
-      <div class="row">
-        <label
-          >Target group size <input type="number" id="target" min="1" value="3"
-        /></label>
-        <label
-          ><input type="radio" name="mode" value="rough" checked /> rough</label
-        >
-        <label
-          ><input type="radio" name="mode" value="precise" /> precise</label
-        >
-        <button id="generate">Generate</button>
-        <button id="regenerate">Regenerate</button>
-      </div>
-      <div id="warn" class="warn hidden"></div>
-      <div id="suggestion" class="muted">No groups generated yet.</div>
-      <div id="snippetWrap" class="hidden">
-        <div class="row" style="margin-top: 8px">
-          <span class="muted">Ready to paste into the days array:</span>
-          <button id="copy">Copy</button>
-        </div>
-        <textarea id="snippet" readonly spellcheck="false"></textarea>
-      </div>
-    </section>
+  .day { padding: 12px 0; border-top: var(--line); }
+  .day:first-child { border-top: 0; padding-top: 0; }
+  .day-label { font-weight: 700; margin-bottom: 6px; }
 
-    <section>
-      <h2>Unmet pairs</h2>
-      <div id="unmet" class="muted"></div>
-    </section>
+  .warn { border: var(--line); padding: 8px 10px; margin-bottom: 12px; }
+  .empty { color: #000; font-style: normal; }
 
-    <script>
-      "use strict";
+  /* Snippet */
+  .snippet-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 6px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 84px;
+    white-space: pre;
+    overflow-x: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+  .stat { font-weight: 700; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
 
-      const PENALTY = 1000; // large cost applied to any pair that has already met
-      const RESTARTS = 3000;
+<h1>Groups</h1>
 
-      const $ = (id) => document.getElementById(id);
-      const index = new Map(people.map((name, i) => [name, i]));
+<script>
+"use strict";
 
-      let met = []; // met[i][j] = times i and j have shared a group
-      let current = null; // latest suggested groups as arrays of indices
+const people = ["Sissi","Fatimah","Dimple","Iana","Shreya","Yasmine","Sara","Chloe","Malia","Nadaa","Alveera","Dara","Lisa","Flavia","Almeena","Mango","Naama","Helena","Nabanita","Lydia"];
 
-      // Build the pairwise "times met" matrix from the days array.
-      function buildMet() {
-        const n = people.length;
-        met = Array.from({ length: n }, () => new Array(n).fill(0));
-        for (const day of days) {
-          for (const group of day.groups) {
-            const ids = group
-              .map((name) => index.get(name))
-              .filter((i) => i !== undefined);
-            for (let a = 0; a < ids.length; a++) {
-              for (let b = a + 1; b < ids.length; b++) {
-                met[ids[a]][ids[b]]++;
-                met[ids[b]][ids[a]]++;
-              }
-            }
-          }
+const days = [
+  { label: "Day 1", groups: [
+    ["Sissi","Fatimah","Dimple","Iana","Shreya"],
+    ["Yasmine","Sara","Chloe","Malia","Nadaa"],
+    ["Alveera","Dara","Lisa","Flavia","Almeena"],
+    ["Mango","Naama","Helena","Nabanita","Lydia"]
+  ]},
+  { label: "Day 2", groups: [
+    ["Sissi","Yasmine","Alveera","Mango"],
+    ["Fatimah","Sara","Flavia","Helena"],
+    ["Dimple","Chloe","Lisa","Naama"],
+    ["Iana","Malia","Dara","Lydia"],
+    ["Shreya","Nadaa","Almeena","Nabanita"]
+  ]},
+  { label: "Day 3", groups: [
+    ["Sissi","Dara"],["Fatimah","Yasmine"],["Almeena","Sara"],["Flavia","Iana"],
+    ["Dimple","Malia"],["Shreya","Alveera"],["Chloe","Nadaa"],["Helena","Lisa"],
+    ["Nabanita","Lydia"],["Mango","Naama"]
+  ]}
+];
+
+const blocked = [];
+</script>
+
+<section>
+  <h2>Founders</h2>
+  <p class="muted"><span class="stat" id="presentCount"></span> present of <span id="totalCount"></span>. Ticked people are included when generating.</p>
+  <div class="founders-grid" id="founders"></div>
+</section>
+
+<section>
+  <h2>Blocked pairs</h2>
+  <p class="hint">Blocked pairs are never placed in the same group, even if that forces a repeat elsewhere.</p>
+  <div class="controls">
+    <select id="blockA"></select>
+    <select id="blockB"></select>
+    <button id="addBlock">Add block</button>
+  </div>
+  <ul class="plain" id="blockList"></ul>
+  <div class="snippet-head">
+    <span class="muted">Ready to paste as the blocked constant:</span>
+    <button class="mini" id="copyBlocked">Copy</button>
+  </div>
+  <textarea id="blockedSnippet" readonly spellcheck="false"></textarea>
+</section>
+
+<section>
+  <h2>Generate</h2>
+  <div class="controls">
+    <label class="field">Target group size <input type="number" id="target" min="1" value="3"></label>
+    <span class="radios">
+      <label><input type="radio" name="mode" value="rough" checked> rough</label>
+      <label><input type="radio" name="mode" value="precise"> precise</label>
+    </span>
+    <button id="generate">Generate</button>
+    <button id="regenerate">Regenerate</button>
+  </div>
+  <div id="warn" class="warn hidden"></div>
+  <div id="suggestion" class="muted">No groups generated yet.</div>
+  <div id="snippetWrap" class="hidden">
+    <div class="snippet-head">
+      <span class="muted">Ready to paste into the days array:</span>
+      <button class="mini" id="copyDay">Copy</button>
+    </div>
+    <textarea id="daySnippet" readonly spellcheck="false"></textarea>
+  </div>
+</section>
+
+<section>
+  <h2>Past days</h2>
+  <div id="past"></div>
+</section>
+
+<section>
+  <h2>Unmet pairs</h2>
+  <div id="unmet" class="muted"></div>
+</section>
+
+<script>
+"use strict";
+
+const PENALTY = 1000;   // large cost applied to any pair that has already met
+const RESTARTS = 3000;
+
+const $ = id => document.getElementById(id);
+const index = new Map(people.map((name, i) => [name, i]));
+const N = people.length;
+
+let met = [];       // met[i][j] = times i and j have shared a group (all founders)
+let block = [];     // block[i][j] = true if i and j must never share a group
+let current = null; // latest suggested groups as arrays of indices
+
+// Build the pairwise "times met" matrix from the days array.
+function buildMet() {
+  met = Array.from({ length: N }, () => new Array(N).fill(0));
+  for (const day of days) {
+    for (const group of day.groups) {
+      const ids = group.map(name => index.get(name)).filter(i => i !== undefined);
+      for (let a = 0; a < ids.length; a++) {
+        for (let b = a + 1; b < ids.length; b++) {
+          met[ids[a]][ids[b]]++;
+          met[ids[b]][ids[a]]++;
         }
       }
+    }
+  }
+}
 
-      // Cost of seating person p alongside person m, given their history.
-      function pairCost(p, m) {
-        const c = met[p][m];
-        return c > 0 ? PENALTY + c : 0;
+// Build the blocked-pair matrix from the blocked array.
+function buildBlock() {
+  block = Array.from({ length: N }, () => new Array(N).fill(false));
+  for (const pair of blocked) {
+    const a = index.get(pair[0]);
+    const b = index.get(pair[1]);
+    if (a === undefined || b === undefined || a === b) continue;
+    block[a][b] = true;
+    block[b][a] = true;
+  }
+}
+
+// Cost of seating person p alongside person m, given their history.
+function pairCost(p, m) {
+  const c = met[p][m];
+  return c > 0 ? PENALTY + c : 0;
+}
+
+// Group sizes for a pool of size n. Returns null (precise, uneven) to signal a warning.
+function groupSizes(n, target, precise) {
+  if (precise) {
+    if (n % target !== 0) return null;
+    return new Array(n / target).fill(target);
+  }
+  const G = Math.max(1, Math.floor(n / target));
+  const base = Math.floor(n / G);
+  const rem = n % G;
+  const sizes = [];
+  for (let i = 0; i < G; i++) sizes.push(i < rem ? base + 1 : base);
+  return sizes; // pool 20, target 3 -> [4,4,3,3,3,3]
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Randomised greedy. A blocked pairing is invalid (never allowed), a repeat is only penalised.
+// Returns null if a person cannot be placed without breaking a block.
+function assign(order, caps) {
+  const groups = caps.map(() => []);
+  for (const p of order) {
+    let best = -1, bestCost = Infinity;
+    for (let g = 0; g < groups.length; g++) {
+      if (groups[g].length >= caps[g]) continue;
+      let cost = 0, ok = true;
+      for (const m of groups[g]) {
+        if (block[p][m]) { ok = false; break; }
+        cost += pairCost(p, m);
       }
+      if (!ok) continue;
+      if (cost < bestCost) { bestCost = cost; best = g; }
+    }
+    if (best === -1) return null; // no valid group; this restart fails
+    groups[best].push(p);
+  }
+  return groups;
+}
 
-      // Group sizes for a target and mode. Returns null (precise, uneven) to signal a warning.
-      function groupSizes(n, target, precise) {
-        if (precise) {
-          if (n % target !== 0) return null;
-          return new Array(n / target).fill(target);
-        }
-        const G = Math.max(1, Math.floor(n / target));
-        const base = Math.floor(n / G);
-        const rem = n % G;
-        const sizes = [];
-        for (let i = 0; i < G; i++) sizes.push(i < rem ? base + 1 : base);
-        return sizes; // target 3, n 20 -> [4,4,3,3,3,3]
+// Total repeat-meeting cost of a full solution.
+function scoreOf(groups) {
+  let s = 0;
+  for (const g of groups) {
+    for (let i = 0; i < g.length; i++) {
+      for (let j = i + 1; j < g.length; j++) {
+        const c = met[g[i]][g[j]];
+        if (c > 0) s += PENALTY + c;
       }
+    }
+  }
+  return s;
+}
 
-      function shuffle(arr) {
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr;
-      }
+function presentIds() {
+  const ids = [];
+  for (let i = 0; i < N; i++) {
+    const cb = $("p" + i);
+    if (cb && cb.checked) ids.push(i);
+  }
+  return ids;
+}
 
-      // Randomised greedy: place each person into the open group where they have met the members fewest times.
-      function assign(order, caps) {
-        const groups = caps.map(() => []);
-        for (const p of order) {
-          let best = -1,
-            bestCost = Infinity;
-          for (let g = 0; g < groups.length; g++) {
-            if (groups[g].length >= caps[g]) continue;
-            let cost = 0;
-            for (const m of groups[g]) cost += pairCost(p, m);
-            if (cost < bestCost) {
-              bestCost = cost;
-              best = g;
-            }
-          }
-          groups[best].push(p);
-        }
-        return groups;
-      }
+function showWarn(text) {
+  const w = $("warn");
+  w.textContent = text;
+  w.classList.remove("hidden");
+}
 
-      // Total repeat-meeting cost of a full solution.
-      function scoreOf(groups) {
-        let s = 0;
-        for (const g of groups) {
-          for (let i = 0; i < g.length; i++) {
-            for (let j = i + 1; j < g.length; j++) {
-              const c = met[g[i]][g[j]];
-              if (c > 0) s += PENALTY + c;
-            }
-          }
-        }
-        return s;
-      }
+function clearSuggestion(msg) {
+  current = null;
+  $("suggestion").textContent = msg;
+  $("snippetWrap").classList.add("hidden");
+}
 
-      function showWarn(text) {
-        const w = $("warn");
-        w.textContent = text;
-        w.classList.remove("hidden");
-      }
+function generate() {
+  $("warn").classList.add("hidden");
+  buildBlock();
 
-      function generate() {
-        $("warn").classList.add("hidden");
-        $("snippetWrap").classList.add("hidden");
-        const n = people.length;
-        const target = parseInt($("target").value, 10);
-        const precise =
-          document.querySelector('input[name="mode"]:checked').value ===
-          "precise";
+  const pool = presentIds();
+  const n = pool.length;
+  const target = parseInt($("target").value, 10);
+  const precise = document.querySelector('input[name="mode"]:checked').value === "precise";
 
-        if (!target || target < 1) {
-          showWarn("Enter a target group size of 1 or more.");
-          current = null;
-          $("suggestion").textContent = "No groups generated.";
-          return;
-        }
-        const caps = groupSizes(n, target, precise);
-        if (caps === null) {
-          showWarn(
-            n +
-              " people do not divide evenly into groups of " +
-              target +
-              ". Choose a different size or switch to rough.",
-          );
-          current = null;
-          $("suggestion").textContent = "No groups generated.";
-          return;
-        }
+  if (n === 0) { clearSuggestion("No one is ticked."); return; }
+  if (!target || target < 1) {
+    showWarn("Enter a target group size of 1 or more.");
+    clearSuggestion("No groups generated.");
+    return;
+  }
+  const caps = groupSizes(n, target, precise);
+  if (caps === null) {
+    showWarn(n + " present do not divide evenly into groups of " + target + ". Choose a different size or switch to rough.");
+    clearSuggestion("No groups generated.");
+    return;
+  }
 
-        const ids = people.map((_, i) => i);
-        let best = null,
-          bestScore = Infinity;
-        for (let r = 0; r < RESTARTS; r++) {
-          const groups = assign(shuffle(ids.slice()), caps);
-          const s = scoreOf(groups);
-          if (s < bestScore) {
-            bestScore = s;
-            best = groups;
-          }
-          if (bestScore === 0) break; // cannot beat no repeats
-        }
+  let best = null, bestScore = Infinity, failures = 0;
+  for (let r = 0; r < RESTARTS; r++) {
+    const groups = assign(shuffle(pool.slice()), caps);
+    if (groups === null) { failures++; continue; }
+    const s = scoreOf(groups);
+    if (s < bestScore) { bestScore = s; best = groups; }
+    if (bestScore === 0) break; // cannot beat no repeats
+  }
 
-        current = best;
-        renderSuggestion();
-      }
+  if (best === null) {
+    showWarn("Could not build groups that honour every blocked pair at this size. Relax a block or change the size.");
+    clearSuggestion("No groups generated.");
+    return;
+  }
 
-      function nextLabel() {
-        if (days.length) {
-          const last = days[days.length - 1].label;
-          const m = last.match(/(\d+)\s*$/);
-          if (m) return last.slice(0, m.index) + (parseInt(m[1], 10) + 1);
-        }
-        return "Day " + (days.length + 1);
-      }
+  current = best;
+  renderSuggestion();
+}
 
-      function renderSuggestion() {
-        const el = $("suggestion");
-        if (!current) {
-          el.textContent = "No groups generated.";
-          return;
-        }
+function nextLabel() {
+  if (days.length) {
+    const last = days[days.length - 1].label;
+    const m = last.match(/(\d+)\s*$/);
+    if (m) return last.slice(0, m.index) + (parseInt(m[1], 10) + 1);
+  }
+  return "Day " + (days.length + 1);
+}
 
-        let repeats = 0;
-        for (const g of current) {
-          for (let i = 0; i < g.length; i++)
-            for (let j = i + 1; j < g.length; j++)
-              if (met[g[i]][g[j]] > 0) repeats++;
-        }
+function renderSuggestion() {
+  const el = $("suggestion");
+  if (!current) { el.textContent = "No groups generated."; return; }
 
-        let html = "";
-        current.forEach((g, i) => {
-          html +=
-            "<div>Group " +
-            (i + 1) +
-            ": " +
-            g.map((x) => escapeHtml(people[x])).join(", ") +
-            "</div>";
-        });
-        html +=
-          '<div class="muted" style="margin-top:6px;">Repeat pairings in this suggestion: ' +
-          repeats +
-          "</div>";
-        el.innerHTML = html;
+  let repeats = 0;
+  for (const g of current) {
+    for (let i = 0; i < g.length; i++)
+      for (let j = i + 1; j < g.length; j++)
+        if (met[g[i]][g[j]] > 0) repeats++;
+  }
 
-        const label = nextLabel();
-        const groupsText = current
-          .map((g) => "[" + g.map((x) => '"' + people[x] + '"').join(",") + "]")
-          .join(",\n    ");
-        const snippet =
-          '{ label: "' + label + '", groups: [\n    ' + groupsText + "\n  ] },";
-        $("snippet").value = snippet;
-        $("snippetWrap").classList.remove("hidden");
-      }
+  let html = '<ul class="groups-list">';
+  current.forEach((g, i) => {
+    html += "<li>Group " + (i + 1) + ": " + g.map(x => escapeHtml(people[x])).join(", ") + "</li>";
+  });
+  html += "</ul>";
+  html += '<p class="muted">Repeat pairings in this suggestion: ' + repeats + "</p>";
+  el.innerHTML = html;
 
-      function renderFounders() {
-        let html =
-          '<div class="muted">' +
-          people.length +
-          ' founders</div><ol class="names">';
-        people.forEach((name) => {
-          html += "<li>" + escapeHtml(name) + "</li>";
-        });
-        html += "</ol>";
-        $("founders").innerHTML = html;
-      }
+  const label = nextLabel();
+  const groupsText = current.map(g => "[" + g.map(x => '"' + people[x] + '"').join(",") + "]").join(",\n    ");
+  $("daySnippet").value = '{ label: "' + label + '", groups: [\n    ' + groupsText + '\n  ] },';
+  $("snippetWrap").classList.remove("hidden");
+}
 
-      function renderPast() {
-        const el = $("past");
-        if (!days.length) {
-          el.textContent = "None yet.";
-          return;
-        }
-        let html = "";
-        for (let d = days.length - 1; d >= 0; d--) {
-          const day = days[d];
-          html +=
-            '<div class="day"><span class="label">' +
-            escapeHtml(day.label) +
-            "</span>";
-          day.groups.forEach((g, i) => {
-            html +=
-              "<div>Group " +
-              (i + 1) +
-              ": " +
-              g.map(escapeHtml).join(", ") +
-              "</div>";
-          });
-          html += "</div>";
-        }
-        el.innerHTML = html;
-      }
+/* Founders */
+function renderFounders() {
+  $("totalCount").textContent = N;
+  let html = "";
+  people.forEach((name, i) => {
+    html += '<label><input type="checkbox" id="p' + i + '" checked> ' + escapeHtml(name) + "</label>";
+  });
+  $("founders").innerHTML = html;
+  people.forEach((_, i) => {
+    $("p" + i).addEventListener("change", updatePresentCount);
+  });
+  updatePresentCount();
+}
 
-      function renderUnmet() {
-        const el = $("unmet");
-        const n = people.length;
-        const totalPairs = (n * (n - 1)) / 2;
-        let unmetPairs = 0;
-        let html = "<ul>";
-        for (let i = 0; i < n; i++) {
-          const missing = [];
-          for (let j = 0; j < n; j++) {
-            if (i === j) continue;
-            if (met[i][j] === 0) {
-              missing.push(people[j]);
-              if (j > i) unmetPairs++;
-            }
-          }
-          const line =
-            escapeHtml(people[i]) +
-            " still needs to meet: " +
-            (missing.length
-              ? missing.map(escapeHtml).join(", ")
-              : "everyone met");
-          html += "<li>" + line + "</li>";
-        }
-        html += "</ul>";
-        el.innerHTML =
-          "<div>" +
-          unmetPairs +
-          " of " +
-          totalPairs +
-          " possible pairs have not yet met.</div>" +
-          html;
-      }
+function updatePresentCount() {
+  $("presentCount").textContent = presentIds().length;
+}
 
-      function escapeHtml(s) {
-        return String(s).replace(
-          /[&<>"]/g,
-          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-        );
-      }
+/* Blocked pairs */
+function fillSelect(sel) {
+  sel.innerHTML = people.map((name, i) => '<option value="' + i + '">' + escapeHtml(name) + "</option>").join("");
+}
 
-      function copySnippet() {
-        const ta = $("snippet");
-        ta.select();
-        ta.setSelectionRange(0, ta.value.length);
-        let ok = false;
-        try {
-          ok = document.execCommand("copy");
-        } catch (e) {
-          ok = false;
-        }
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(ta.value).catch(() => {});
-        }
-        const btn = $("copy");
-        const old = btn.textContent;
-        btn.textContent = "Copied";
-        setTimeout(() => {
-          btn.textContent = old;
-        }, 1200);
-      }
+function addBlock() {
+  const a = parseInt($("blockA").value, 10);
+  const b = parseInt($("blockB").value, 10);
+  if (a === b) { showBlockNote("Choose two different people."); return; }
+  const na = people[a], nb = people[b];
+  const exists = blocked.some(p =>
+    (p[0] === na && p[1] === nb) || (p[0] === nb && p[1] === na));
+  if (exists) { showBlockNote("That pair is already blocked."); return; }
+  blocked.push([na, nb]);
+  renderBlocks();
+}
 
-      buildMet();
-      renderFounders();
-      renderPast();
-      renderUnmet();
-      $("generate").addEventListener("click", generate);
-      $("regenerate").addEventListener("click", generate);
-      $("copy").addEventListener("click", copySnippet);
-    </script>
-  </body>
+function removeBlock(i) {
+  blocked.splice(i, 1);
+  renderBlocks();
+}
+
+let blockNoteTimer = null;
+function showBlockNote(msg) {
+  const list = $("blockList");
+  let note = document.getElementById("blockNote");
+  if (!note) {
+    note = document.createElement("li");
+    note.id = "blockNote";
+    list.appendChild(note);
+  }
+  note.textContent = msg;
+  if (blockNoteTimer) clearTimeout(blockNoteTimer);
+  blockNoteTimer = setTimeout(() => { const n = document.getElementById("blockNote"); if (n) n.remove(); }, 2000);
+}
+
+function renderBlocks() {
+  const list = $("blockList");
+  if (!blocked.length) {
+    list.innerHTML = '<li class="empty muted">No blocked pairs.</li>';
+  } else {
+    list.innerHTML = "";
+    blocked.forEach((pair, i) => {
+      const li = document.createElement("li");
+      const span = document.createElement("span");
+      span.className = "grow";
+      span.textContent = pair[0] + " and " + pair[1];
+      const btn = document.createElement("button");
+      btn.className = "mini";
+      btn.textContent = "Remove";
+      btn.addEventListener("click", () => removeBlock(i));
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  }
+  const body = blocked.map(p => '["' + p[0] + '","' + p[1] + '"]').join(", ");
+  $("blockedSnippet").value = "const blocked = [" + body + "];";
+}
+
+/* Past days */
+function renderPast() {
+  const el = $("past");
+  if (!days.length) { el.innerHTML = '<p class="empty muted">None yet.</p>'; return; }
+  let html = "";
+  for (let d = days.length - 1; d >= 0; d--) {
+    const day = days[d];
+    html += '<div class="day"><div class="day-label">' + escapeHtml(day.label) + '</div><ul class="groups-list">';
+    day.groups.forEach((g, i) => {
+      html += "<li>Group " + (i + 1) + ": " + g.map(escapeHtml).join(", ") + "</li>";
+    });
+    html += "</ul></div>";
+  }
+  el.innerHTML = html;
+}
+
+/* Unmet pairs (counts everyone, regardless of who is ticked) */
+function renderUnmet() {
+  const el = $("unmet");
+  const totalPairs = N * (N - 1) / 2;
+  let unmetPairs = 0;
+  for (let i = 0; i < N; i++)
+    for (let j = i + 1; j < N; j++)
+      if (met[i][j] === 0) unmetPairs++;
+  el.innerHTML = '<p><span class="stat">' + unmetPairs + "</span> of " + totalPairs + " possible pairs have not yet met.</p>";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function copyFrom(id, btnId) {
+  const ta = $(id);
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  try { document.execCommand("copy"); } catch (e) {}
+  if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(() => {});
+  const btn = $(btnId);
+  const old = btn.textContent;
+  btn.textContent = "Copied";
+  setTimeout(() => { btn.textContent = old; }, 1200);
+}
+
+/* Init */
+buildMet();
+renderFounders();
+fillSelect($("blockA"));
+fillSelect($("blockB"));
+$("blockB").selectedIndex = Math.min(1, N - 1);
+renderBlocks();
+renderPast();
+renderUnmet();
+
+$("addBlock").addEventListener("click", addBlock);
+$("generate").addEventListener("click", generate);
+$("regenerate").addEventListener("click", generate);
+$("copyDay").addEventListener("click", () => copyFrom("daySnippet", "copyDay"));
+$("copyBlocked").addEventListener("click", () => copyFrom("blockedSnippet", "copyBlocked"));
+</script>
+
+</body>
 </html>
